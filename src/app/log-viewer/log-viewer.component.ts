@@ -20,6 +20,9 @@ import { FormsModule } from '@angular/forms';
         <label class="filter-signalr-label">
           <input type="checkbox" [(ngModel)]="filterSignalR" (change)="filterLogs()" /> [SignalR]
         </label>
+        <label class="request-response-label">
+          <input type="checkbox" [(ngModel)]="filterRequestResponse" (change)="filterLogs()" /> Request-Response
+        </label>
       </div>
       <div class="log-info">
         <label>Total logs in file: {{ totalLogs }}</label>
@@ -45,6 +48,7 @@ import { FormsModule } from '@angular/forms';
     `.signalr-label { display: flex; align-items: center; background-color: red; padding: 5px; border-radius: 5px; }`,
     `.hub-label { display: flex; align-items: center; background-color: yellow; padding: 5px; border-radius: 5px; }`,
     `.filter-signalr-label { display: flex; align-items: center; }`,
+    `.request-response-label { display: flex; align-items: center; }`,
     `.highlight-signalr { background-color: #ffcccc; }`, // Red background color for highlighting
     `.highlight-hub { background-color: #ffffcc; }`, // Yellow background color for highlighting
     `.loader { text-align: center; font-size: 20px; padding: 20px; }` // Loader style
@@ -59,6 +63,7 @@ export class LogViewerComponent {
   highlightSignalR: boolean = false;
   highlightHub: boolean = false;
   filterSignalR: boolean = false;
+  filterRequestResponse: boolean = false;
   isLoading: boolean = false; // Loading state
 
   loadFile(event: any): void {
@@ -77,17 +82,21 @@ export class LogViewerComponent {
 
   filterLogs(): void {
     this.isLoading = true; // Start loading
-    let filtered = this.logs;
+    let filtered = this.groupLogs(this.logs);
 
     if (this.filterId) {
-      filtered = filtered.filter(line => line.includes(this.filterId));
+      filtered = filtered.filter(log => log.includes(this.filterId));
     }
 
     if (this.filterSignalR) {
-      filtered = filtered.filter(line => line.includes('[SignalR]') || line.includes('WebScapeHub'));
+      filtered = filtered.filter(log => log.includes('[SignalR]') || log.includes('WebScapeHub'));
     }
 
-    this.filteredLogs = this.groupLogs(filtered);
+    if (this.filterRequestResponse) {
+      filtered = this.filterRequestResponseLogs(filtered);
+    }
+
+    this.filteredLogs = filtered;
     this.isLoading = false; // End loading
   }
 
@@ -122,5 +131,38 @@ export class LogViewerComponent {
   
   isTimestamp(line: string): boolean {
     return this.extractTimestamp(line) !== null;
+  }
+
+  filterRequestResponseLogs(logs: string[]): string[] {
+    const requestResponseLogs: string[] = [];
+    const requestResponseMap: Map<string, string[]> = new Map();
+
+    logs.forEach(log => {
+      const requestIdMatch = log.match(/Request ID:([a-zA-Z0-9-]+)/);
+      const responseIdMatch = log.match(/Response ID:([a-zA-Z0-9-]+)/);
+
+      if (requestIdMatch) {
+        const requestId = requestIdMatch[1];
+        if (!requestResponseMap.has(requestId)) {
+          requestResponseMap.set(requestId, []);
+        }
+        requestResponseMap.get(requestId)!.push(log);
+      }
+
+      if (responseIdMatch) {
+        const responseId = responseIdMatch[1];
+        if (!requestResponseMap.has(responseId)) {
+          requestResponseMap.set(responseId, []);
+        }
+        requestResponseMap.get(responseId)!.push(log);
+      }
+    });
+
+    requestResponseMap.forEach((logs, id) => {
+      const uniqueLogs = Array.from(new Set(logs));
+      requestResponseLogs.push(uniqueLogs.join('\n'));
+    });
+
+    return requestResponseLogs;
   }
 }
