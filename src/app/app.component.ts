@@ -6,7 +6,7 @@ import { LogViewerComponent } from './log-viewer/log-viewer.component';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, CommonModule, FormsModule, LogViewerComponent],
+  imports: [CommonModule, FormsModule, LogViewerComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css',
 })

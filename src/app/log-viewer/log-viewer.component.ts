@@ -95,7 +95,7 @@ export class LogViewerComponent {
     const groupedLogs: string[] = [];
     let currentLog: string[] = [];
     let currentTimestamp: string | null = null;
-
+  
     for (const line of logs) {
       const timestamp = this.extractTimestamp(line);
       if (timestamp && timestamp !== currentTimestamp) {
@@ -107,19 +107,19 @@ export class LogViewerComponent {
       }
       currentLog.push(line);
     }
-
+  
     if (currentLog.length > 0) {
       groupedLogs.push(currentLog.join('\n'));
     }
-
+  
     return groupedLogs;
   }
 
   extractTimestamp(line: string): string | null {
-    const match = line.match(/\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \+\d{2}:\d{2}\]/);
+    const match = line.match(/\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} [+-]\d{2}:\d{2}\]/);
     return match ? match[0] : null;
   }
-
+  
   isTimestamp(line: string): boolean {
     return this.extractTimestamp(line) !== null;
   }
