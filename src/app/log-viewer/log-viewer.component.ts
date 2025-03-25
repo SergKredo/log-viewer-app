@@ -1,6 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MatSelectModule } from '@angular/material/select';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
 @Component({
@@ -24,6 +26,23 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
         <label class="request-response-label">
           <input type="checkbox" [(ngModel)]="filterRequestResponse" (change)="filterLogs()" /> Request-Response
         </label>
+        <!-- Updated Error Code Control -->
+        <div class="error-code-control">
+          <label class="error-code-label">[HTTP code Apache]</label>
+          <div class="dropdown">
+            <button (click)="toggleDropdown()" class="dropdown-trigger fixed-width">{{ renderSelectedErrors() }}</button>
+            <div *ngIf="dropdownOpen" class="dropdown-content">
+              <label *ngFor="let error of errorCodes" class="dropdown-item">
+                <input 
+                  type="checkbox" 
+                  [value]="error" 
+                  (change)="toggleError(error)" 
+                  [checked]="selectedErrorCodes.includes(error)"
+                /> {{ error }}
+              </label>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="log-info">
         <label>Total logs in file: {{ totalLogs }}</label>
@@ -53,9 +72,28 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
     `.highlight-signalr { background-color: #ffcccc; }`,
     `.highlight-hub { background-color: #ffffcc; }`,
     `.loader { text-align: center; font-size: 20px; padding: 20px; }`,
-    `.highlight { background-color: #28a745; color: white; font-weight: bold; padding: 2px 4px; border-radius: 3px; }`
+    `.highlight { background-color: #28a745; color: white; font-weight: bold; padding: 2px 4px; border-radius: 3px; }`,
+    `.highlight-http { background-color: orange; color: black; font-weight: bold; padding: 2px 4px; border-radius: 3px; }`,
+    `::ng-deep .error-code-control { position: relative; display: inline-flex; align-items: center; gap: 10px; }`,
+    `::ng-deep .error-code-label { font-weight: bold; }`,
+    `::ng-deep .dropdown-trigger.fixed-width { width: 200px; padding: 5px 10px; background-color: white; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }`,
+    `::ng-deep .dropdown { position: relative;}`,
+    `::ng-deep .dropdown-content { 
+      position: absolute; 
+      top: 100%; 
+      left: 0;
+      background: white; 
+      border: 1px solid #ccc; 
+      border-radius: 4px; 
+      padding: 5px; 
+      z-index: 1000; 
+      min-width: 94%;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); 
+    }`,
+    `::ng-deep .dropdown-item { display: flex; align-items: center; padding: 2px 0; }`,
+    `::ng-deep .dropdown-item input { margin-right: 5px; }`
   ],
-  imports: [CommonModule, FormsModule]
+  imports: [CommonModule, FormsModule, MatSelectModule, MatFormFieldModule]
 })
 export class LogViewerComponent {
   logs: string[] = [];
@@ -71,6 +109,10 @@ export class LogViewerComponent {
   pageSize: number = 100; // Number of logs per page
   currentPage: number = 0; // Current page index
   visibleLogs: string[] = []; // Logs currently visible on the page
+
+  errorCodes: number[] = [100, 200, 300, 400, 500]; 
+  selectedErrorCodes: number[] = []; 
+  dropdownOpen = false;
 
   constructor(private sanitizer: DomSanitizer) {}
 
@@ -112,30 +154,49 @@ export class LogViewerComponent {
 
   filterLogs(): void {
     this.isLoading = true;
-
+  
     // Start by grouping logs
     let filtered = this.groupLogs(this.logs);
-
+  
     // Filter by identifier
     if (this.filterId) {
       filtered = filtered.filter(group => group.split('\n').some(line => line.includes(this.filterId)));
     }
-
+  
     // Filter by SignalR
     if (this.filterSignalR) {
       filtered = filtered.filter(group => group.split('\n').some(line => line.includes('[SignalR]') || line.includes('WebScapeHub')));
     }
-
+  
+    // Filter by selected error codes (Apache HTTP status codes)
+    if (this.selectedErrorCodes.length > 0) {
+      filtered = filtered.filter(group =>
+        group.split('\n').some(line => this.selectedErrorCodes.some(code => this.isApacheHttpStatusInRange(line, code)))
+      );
+    }
+  
     // Apply other filters if needed
     if (this.filterRequestResponse) {
       filtered = this.filterRequestResponseLogs(filtered);
     }
-
+  
     // Update filtered logs
     this.filteredLogs = filtered;
     this.currentPage = 0;
     this.updateVisibleLogs();
     this.isLoading = false;
+  }
+
+  isApacheHttpStatusInRange(line: string, baseCode: number): boolean {
+    // Match Apache HTTP status codes in the log line
+    const apacheStatusMatch = line.match(/HTTP\/\d\.\d" (\d{3})/);
+    if (apacheStatusMatch) {
+      const status = parseInt(apacheStatusMatch[1], 10);
+      const rangeStart = baseCode;
+      const rangeEnd = baseCode + 99; // Define the range (e.g., 200-299 for 200)
+      return status >= rangeStart && status <= rangeEnd;
+    }
+    return false;
   }
 
   groupLogs(logs: string[]): string[] {
@@ -163,19 +224,17 @@ export class LogViewerComponent {
   }
 
   extractTimestamp(line: string): string | null {
-    // ISO 8601 format
     const isoMatch = line.match(/\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} [+-]\d{2}:\d{2}\]/);
     if (isoMatch) {
       return isoMatch[0];
     }
 
-    // Apache format
     const apacheMatch = line.match(/\[\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}\]/);
     if (apacheMatch) {
       return apacheMatch[0];
     }
 
-    return null; // If no timestamp is found
+    return null;
   }
 
   filterRequestResponseLogs(logs: string[]): string[] {
@@ -191,7 +250,6 @@ export class LogViewerComponent {
         if (!requestResponseMap.has(requestId)) {
           requestResponseMap.set(requestId, []);
         }
-        // Filter by identifier when adding logs
         if (!this.filterId || log.includes(this.filterId)) {
           requestResponseMap.get(requestId)!.push(log);
         }
@@ -202,17 +260,14 @@ export class LogViewerComponent {
         if (!requestResponseMap.has(responseId)) {
           requestResponseMap.set(responseId, []);
         }
-        // Filter by identifier when adding logs
         if (!this.filterId || log.includes(this.filterId)) {
           requestResponseMap.get(responseId)!.push(log);
         }
       }
     });
 
-    // Create unique logs for each ID
     requestResponseMap.forEach((logs, id) => {
       const uniqueLogs = Array.from(new Set(logs));
-      // Ensure the result contains only logs with the specified identifier
       if (!this.filterId || uniqueLogs.some(log => log.includes(this.filterId))) {
         requestResponseLogs.push(uniqueLogs.join('\n'));
       }
@@ -221,13 +276,53 @@ export class LogViewerComponent {
     return requestResponseLogs;
   }
 
-  highlightFilter(log: string): SafeHtml {
-    if (!this.filterId) {
-      return log; // If the filter is not set, return the log unchanged
+  toggleDropdown() {
+    this.dropdownOpen = !this.dropdownOpen;
+  }
+
+  toggleError(error: number) {
+    if (this.selectedErrorCodes.includes(error)) {
+      this.selectedErrorCodes = this.selectedErrorCodes.filter(code => code !== error);
+    } else {
+      this.selectedErrorCodes.push(error);
     }
-    const escapedFilterId = this.filterId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape special characters
-    const regex = new RegExp(`(${escapedFilterId})`, 'gi'); // Regular expression to find the identifier
-    const highlightedLog = log.replace(regex, '<span class="highlight">$1</span>'); // Insert <span> tag with the highlight class
-    return this.sanitizer.bypassSecurityTrustHtml(highlightedLog); // Mark the HTML as safe
+  }
+
+  renderSelectedErrors(): string {
+    return this.selectedErrorCodes.length > 0 ? this.selectedErrorCodes.join(', ') : 'Error Codes';
+  }
+
+  highlightFilter(log: string): SafeHtml {
+    let highlightedLog = log;
+  
+    // Highlight filterId if provided
+    if (this.filterId) {
+      const escapedFilterId = this.filterId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(${escapedFilterId})`, 'gi');
+      highlightedLog = highlightedLog.replace(regex, '<span class="highlight">$1</span>');
+    }
+  
+    // Highlight selected HTTP status codes
+    if (this.selectedErrorCodes.length > 0) {
+      this.selectedErrorCodes.forEach(baseCode => {
+        const rangeStart = baseCode;
+        const rangeEnd = baseCode + 99;
+        const statusRegex = new RegExp(`HTTP\\/\\d\\.\\d"\\s(${rangeStart}|${rangeStart + 1}|${rangeStart + 2}|...|${rangeEnd})`, 'g');
+        highlightedLog = highlightedLog.replace(statusRegex, '<span class="highlight-http">$1</span>');
+      });
+    }
+  
+    return this.sanitizer.bypassSecurityTrustHtml(highlightedLog);
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    const target = event.target as HTMLElement;
+    const dropdown = document.querySelector('.dropdown-content');
+    const trigger = document.querySelector('.dropdown-trigger');
+
+    if (this.dropdownOpen && dropdown && trigger && !dropdown.contains(target) && !trigger.contains(target)) {
+      this.dropdownOpen = false;
+    }
   }
 }
