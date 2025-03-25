@@ -1,1 +1,9 @@
 /* You can add global styles to this file, and also import other style files */
+.highlight { 
+    background-color: #28a745; 
+    color: white; 
+    font-weight: bold; 
+    padding: 2px 4px; 
+    border-radius: 3px; 
+}
+

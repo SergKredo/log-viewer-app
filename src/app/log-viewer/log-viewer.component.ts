@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-log-viewer',
@@ -28,11 +29,11 @@ import { FormsModule } from '@angular/forms';
         <label>Total logs in file: {{ totalLogs }}</label>
         <label>Filtered logs: {{ filteredLogs.length }}</label>
       </div>
-      <div class="log-container">
+      <div class="log-container" (scroll)="onScroll($event)">
         <div *ngIf="isLoading" class="loader">Loading...</div>
-        <details *ngFor="let log of filteredLogs" [ngClass]="{'highlight-signalr': highlightSignalR && log.includes('[SignalR]'), 'highlight-hub': highlightHub && log.includes('WebScapeHub')}">
+        <details *ngFor="let log of visibleLogs" [ngClass]="{'highlight-signalr': highlightSignalR && log.includes('[SignalR]'), 'highlight-hub': highlightHub && log.includes('WebScapeHub')}">
           <summary>{{ log.split('\n')[0] }}</summary>
-          <pre>{{ log }}</pre>
+          <pre [innerHTML]="highlightFilter(log)"></pre>
         </details>
       </div>
     </div>
@@ -41,7 +42,7 @@ import { FormsModule } from '@angular/forms';
     `.container { width: 100%; height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px; box-sizing: border-box; }`,
     `.controls { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; justify-content: center; align-items: center; }`,
     `input, button { padding: 5px; }`,
-    `.filter-input { width: 400px; }`, // Increase input field width
+    `.filter-input { width: 400px; }`,
     `.log-info { display: flex; gap: 20px; margin-bottom: 10px; justify-content: center; }`,
     `.log-container { width: 100%; flex-grow: 1; text-align: left; background: #f4f4f4; padding: 10px; overflow-y: auto; border: 1px solid #ccc;}`,
     `.label { margin-right: 10px; }`,
@@ -49,9 +50,10 @@ import { FormsModule } from '@angular/forms';
     `.hub-label { display: flex; align-items: center; background-color: yellow; padding: 5px; border-radius: 5px; }`,
     `.filter-signalr-label { display: flex; align-items: center; }`,
     `.request-response-label { display: flex; align-items: center; }`,
-    `.highlight-signalr { background-color: #ffcccc; }`, // Red background color for highlighting
-    `.highlight-hub { background-color: #ffffcc; }`, // Yellow background color for highlighting
-    `.loader { text-align: center; font-size: 20px; padding: 20px; }` // Loader style
+    `.highlight-signalr { background-color: #ffcccc; }`,
+    `.highlight-hub { background-color: #ffffcc; }`,
+    `.loader { text-align: center; font-size: 20px; padding: 20px; }`,
+    `.highlight { background-color: #28a745; color: white; font-weight: bold; padding: 2px 4px; border-radius: 3px; }`
   ],
   imports: [CommonModule, FormsModule]
 })
@@ -64,7 +66,13 @@ export class LogViewerComponent {
   highlightHub: boolean = false;
   filterSignalR: boolean = false;
   filterRequestResponse: boolean = false;
-  isLoading: boolean = false; // Loading state
+  isLoading: boolean = false;
+
+  pageSize: number = 100; // Number of logs per page
+  currentPage: number = 0; // Current page index
+  visibleLogs: string[] = []; // Logs currently visible on the page
+
+  constructor(private sanitizer: DomSanitizer) {}
 
   loadFile(event: any): void {
     const file = event.target.files[0];
@@ -75,36 +83,66 @@ export class LogViewerComponent {
       this.logs = e.target.result.split('\n');
       this.filteredLogs = this.groupLogs(this.logs);
       this.totalLogs = this.filteredLogs.length;
+      this.currentPage = 0;
+      this.updateVisibleLogs();
       this.isLoading = false; // End loading
     };
     reader.readAsText(file);
   }
 
+  updateVisibleLogs(): void {
+    const start = this.currentPage * this.pageSize;
+    const end = start + this.pageSize;
+    this.visibleLogs = this.filteredLogs.slice(start, end);
+  }
+
+  onScroll(event: any): void {
+    const { scrollTop, scrollHeight, clientHeight } = event.target;
+    if (scrollTop + clientHeight >= scrollHeight) {
+      this.loadNextPage();
+    }
+  }
+
+  loadNextPage(): void {
+    if ((this.currentPage + 1) * this.pageSize < this.filteredLogs.length) {
+      this.currentPage++;
+      this.updateVisibleLogs();
+    }
+  }
+
   filterLogs(): void {
-    this.isLoading = true; // Start loading
+    this.isLoading = true;
+
+    // Start by grouping logs
     let filtered = this.groupLogs(this.logs);
 
+    // Filter by identifier
     if (this.filterId) {
-      filtered = filtered.filter(log => log.includes(this.filterId));
+      filtered = filtered.filter(group => group.split('\n').some(line => line.includes(this.filterId)));
     }
 
+    // Filter by SignalR
     if (this.filterSignalR) {
-      filtered = filtered.filter(log => log.includes('[SignalR]') || log.includes('WebScapeHub'));
+      filtered = filtered.filter(group => group.split('\n').some(line => line.includes('[SignalR]') || line.includes('WebScapeHub')));
     }
 
+    // Apply other filters if needed
     if (this.filterRequestResponse) {
       filtered = this.filterRequestResponseLogs(filtered);
     }
 
+    // Update filtered logs
     this.filteredLogs = filtered;
-    this.isLoading = false; // End loading
+    this.currentPage = 0;
+    this.updateVisibleLogs();
+    this.isLoading = false;
   }
 
   groupLogs(logs: string[]): string[] {
     const groupedLogs: string[] = [];
     let currentLog: string[] = [];
     let currentTimestamp: string | null = null;
-  
+
     for (const line of logs) {
       const timestamp = this.extractTimestamp(line);
       if (timestamp && timestamp !== currentTimestamp) {
@@ -116,21 +154,28 @@ export class LogViewerComponent {
       }
       currentLog.push(line);
     }
-  
+
     if (currentLog.length > 0) {
       groupedLogs.push(currentLog.join('\n'));
     }
-  
+
     return groupedLogs;
   }
 
   extractTimestamp(line: string): string | null {
-    const match = line.match(/\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} [+-]\d{2}:\d{2}\]/);
-    return match ? match[0] : null;
-  }
-  
-  isTimestamp(line: string): boolean {
-    return this.extractTimestamp(line) !== null;
+    // ISO 8601 format
+    const isoMatch = line.match(/\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} [+-]\d{2}:\d{2}\]/);
+    if (isoMatch) {
+      return isoMatch[0];
+    }
+
+    // Apache format
+    const apacheMatch = line.match(/\[\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}\]/);
+    if (apacheMatch) {
+      return apacheMatch[0];
+    }
+
+    return null; // If no timestamp is found
   }
 
   filterRequestResponseLogs(logs: string[]): string[] {
@@ -146,7 +191,10 @@ export class LogViewerComponent {
         if (!requestResponseMap.has(requestId)) {
           requestResponseMap.set(requestId, []);
         }
-        requestResponseMap.get(requestId)!.push(log);
+        // Filter by identifier when adding logs
+        if (!this.filterId || log.includes(this.filterId)) {
+          requestResponseMap.get(requestId)!.push(log);
+        }
       }
 
       if (responseIdMatch) {
@@ -154,15 +202,32 @@ export class LogViewerComponent {
         if (!requestResponseMap.has(responseId)) {
           requestResponseMap.set(responseId, []);
         }
-        requestResponseMap.get(responseId)!.push(log);
+        // Filter by identifier when adding logs
+        if (!this.filterId || log.includes(this.filterId)) {
+          requestResponseMap.get(responseId)!.push(log);
+        }
       }
     });
 
+    // Create unique logs for each ID
     requestResponseMap.forEach((logs, id) => {
       const uniqueLogs = Array.from(new Set(logs));
-      requestResponseLogs.push(uniqueLogs.join('\n'));
+      // Ensure the result contains only logs with the specified identifier
+      if (!this.filterId || uniqueLogs.some(log => log.includes(this.filterId))) {
+        requestResponseLogs.push(uniqueLogs.join('\n'));
+      }
     });
 
     return requestResponseLogs;
+  }
+
+  highlightFilter(log: string): SafeHtml {
+    if (!this.filterId) {
+      return log; // If the filter is not set, return the log unchanged
+    }
+    const escapedFilterId = this.filterId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape special characters
+    const regex = new RegExp(`(${escapedFilterId})`, 'gi'); // Regular expression to find the identifier
+    const highlightedLog = log.replace(regex, '<span class="highlight">$1</span>'); // Insert <span> tag with the highlight class
+    return this.sanitizer.bypassSecurityTrustHtml(highlightedLog); // Mark the HTML as safe
   }
 }
