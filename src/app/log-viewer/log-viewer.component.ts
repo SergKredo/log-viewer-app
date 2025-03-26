@@ -80,7 +80,7 @@ import { ScrollingModule } from '@angular/cdk/scrolling';
     `.highlight-hub { background-color: #ffffcc; }`,
     `.loader { text-align: center; font-size: 20px; padding: 20px; }`,
     `.virtual-scroll-viewport {
-        height: calc(100vh - 125px); /* Adjust height as needed */
+        height: calc(100vh - 196px); /* Adjust height as needed */
         width: 100%;
         overflow: auto;
         border: 1px solid #ccc;
