@@ -1,9 +1,10 @@
-import { Component, HostListener } from '@angular/core';
+import { ChangeDetectorRef, Component, HostListener, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { ScrollingModule } from '@angular/cdk/scrolling';
 
 @Component({
   selector: 'app-log-viewer',
@@ -12,7 +13,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
       <h2>Log Upload and Filtering</h2>
       <div class="controls">
         <input type="file" (change)="loadFile($event)" accept=".log,.txt" />
-        <input type="text" [(ngModel)]="filterId" placeholder="Enter identifier" class="filter-input" />
+        <input type="text" [(ngModel)]="filterId" placeholder="Enter identifier" class="filter-input" (keyup.enter)="filterLogs()" />
         <button (click)="filterLogs()">Filter</button>
         <label class="signalr-label">
           <input type="checkbox" [(ngModel)]="highlightSignalR" /> Client-[SignalR]
@@ -26,7 +27,6 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
         <label class="request-response-label">
           <input type="checkbox" [(ngModel)]="filterRequestResponse" (change)="filterLogs()" /> Request-Response
         </label>
-        <!-- Updated Error Code Control -->
         <div class="error-code-control">
           <label class="error-code-label">[HTTP code Apache]</label>
           <div class="dropdown">
@@ -48,22 +48,26 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
         <label>Total logs in file: {{ totalLogs }}</label>
         <label>Filtered logs: {{ filteredLogs.length }}</label>
       </div>
-      <div class="log-container" (scroll)="onScroll($event)">
-        <div *ngIf="isLoading" class="loader">Loading...</div>
-        <details *ngFor="let log of visibleLogs" [ngClass]="{'highlight-signalr': highlightSignalR && log.includes('[SignalR]'), 'highlight-hub': highlightHub && log.includes('WebScapeHub')}">
-          <summary>{{ log.split('\n')[0] }}</summary>
-          <pre [innerHTML]="highlightFilter(log)"></pre>
-        </details>
+      <div class="log-container">
+        <cdk-virtual-scroll-viewport itemSize="10" class="virtual-scroll-viewport">
+          <div *cdkVirtualFor="let log of filteredLogs; let i = index" [ngClass]="{'highlight-signalr': highlightSignalR && log.includes('[SignalR]'), 'highlight-hub': highlightHub && log.includes('WebScapeHub')}">
+            <details [open]="expandedLogs.get(i) || false" (toggle)="toggleLogState(i, $event)">
+              <summary>{{ log.split('\n')[0] }}</summary>
+              <pre [innerHTML]="highlightFilter(log)"></pre>
+            </details>
+          </div>
+        </cdk-virtual-scroll-viewport>
       </div>
     </div>
   `,
   styles: [
-    `.container { width: 100%; height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px; box-sizing: border-box; }`,
-    `.controls { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; justify-content: center; align-items: center; }`,
+    `.container { width: 100%; height: 100vh; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding: 0px; box-sizing: border-box; overflow: hidden; }`,
+    `.controls { display: flex; gap: 10px; margin-bottom: 5px; flex-wrap: wrap; max-width: 1800px; width: calc(100% - 20px); justify-content: center; align-items: center; }`,
+    `h2 { margin: 0 0 5px 0; font-size: 1.5rem; }`,
     `input, button { padding: 5px; }`,
     `.filter-input { width: 400px; }`,
-    `.log-info { display: flex; gap: 20px; margin-bottom: 10px; justify-content: center; }`,
-    `.log-container { width: 100%; flex-grow: 1; text-align: left; background: #f4f4f4; padding: 10px; overflow-y: auto; border: 1px solid #ccc;}`,
+    `.log-info { display: flex; gap: 20px; max-width: 1800px; width: calc(100% - 20px); margin-bottom: 10px; justify-content: center; }`,
+    `.log-container { height: calc(100vh - 150px); width: calc(100% - 20px); max-width: 1800px; flex-grow: 1; text-align: left; background: #f4f4f4; padding: 10px; margin: 0 auto; overflow-y: auto; border: 1px solid #ccc;}`,
     `.label { margin-right: 10px; }`,
     `.signalr-label { display: flex; align-items: center; background-color: red; padding: 5px; border-radius: 5px; }`,
     `.hub-label { display: flex; align-items: center; background-color: yellow; padding: 5px; border-radius: 5px; }`,
@@ -72,6 +76,13 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
     `.highlight-signalr { background-color: #ffcccc; }`,
     `.highlight-hub { background-color: #ffffcc; }`,
     `.loader { text-align: center; font-size: 20px; padding: 20px; }`,
+    `.virtual-scroll-viewport {
+        height: calc(100vh - 125px); /* Adjust height as needed */
+        width: 100%;
+        overflow: auto;
+        border: 1px solid #ccc;
+        box-sizing: border-box;
+      }`,
     `.highlight { background-color: #28a745; color: white; font-weight: bold; padding: 2px 4px; border-radius: 3px; }`,
     `.highlight-http { background-color: orange; color: black; font-weight: bold; padding: 2px 4px; border-radius: 3px; }`,
     `::ng-deep .error-code-control { position: relative; display: inline-flex; align-items: center; gap: 10px; }`,
@@ -93,11 +104,12 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
     `::ng-deep .dropdown-item { display: flex; align-items: center; padding: 2px 0; }`,
     `::ng-deep .dropdown-item input { margin-right: 5px; }`
   ],
-  imports: [CommonModule, FormsModule, MatSelectModule, MatFormFieldModule]
+  imports: [CommonModule, FormsModule, MatSelectModule, MatFormFieldModule, ScrollingModule]
 })
 export class LogViewerComponent {
   logs: string[] = [];
   filteredLogs: string[] = [];
+  expandedLogs: Map<number, boolean> = new Map(); // Stores expanded/collapsed state of logs
   filterId: string = '';
   totalLogs: number = 0;
   highlightSignalR: boolean = false;
@@ -106,15 +118,11 @@ export class LogViewerComponent {
   filterRequestResponse: boolean = false;
   isLoading: boolean = false;
 
-  pageSize: number = 100; // Number of logs per page
-  currentPage: number = 0; // Current page index
-  visibleLogs: string[] = []; // Logs currently visible on the page
-
   errorCodes: number[] = [100, 200, 300, 400, 500]; 
   selectedErrorCodes: number[] = []; 
   dropdownOpen = false;
 
-  constructor(private sanitizer: DomSanitizer) {}
+  constructor(private sanitizer: DomSanitizer, private cdr: ChangeDetectorRef, private zone: NgZone) {}
 
   loadFile(event: any): void {
     const file = event.target.files[0];
@@ -122,78 +130,63 @@ export class LogViewerComponent {
     this.isLoading = true; // Start loading
     const reader = new FileReader();
     reader.onload = (e: any) => {
-      this.logs = e.target.result.split('\n');
-      this.filteredLogs = this.groupLogs(this.logs);
-      this.totalLogs = this.filteredLogs.length;
-      this.currentPage = 0;
-      this.updateVisibleLogs();
-      this.isLoading = false; // End loading
+      this.zone.run(() => {
+        this.logs = e.target.result.split('\n');
+        this.filteredLogs = this.groupLogs(this.logs);
+        console.log('Filtered Logs:', this.filteredLogs); // Debugging output
+        this.totalLogs = this.filteredLogs.length;
+        this.isLoading = false; // End loading
+        this.cdr.detectChanges(); // Notify Angular about changes
+      });
     };
     reader.readAsText(file);
-  }
-
-  updateVisibleLogs(): void {
-    const start = this.currentPage * this.pageSize;
-    const end = start + this.pageSize;
-    this.visibleLogs = this.filteredLogs.slice(start, end);
-  }
-
-  onScroll(event: any): void {
-    const { scrollTop, scrollHeight, clientHeight } = event.target;
-    if (scrollTop + clientHeight >= scrollHeight) {
-      this.loadNextPage();
-    }
-  }
-
-  loadNextPage(): void {
-    if ((this.currentPage + 1) * this.pageSize < this.filteredLogs.length) {
-      this.currentPage++;
-      this.updateVisibleLogs();
-    }
   }
 
   filterLogs(): void {
     this.isLoading = true;
   
-    // Start by grouping logs
     let filtered = this.groupLogs(this.logs);
   
-    // Filter by identifier
     if (this.filterId) {
-      filtered = filtered.filter(group => group.split('\n').some(line => line.includes(this.filterId)));
+      const lowerCaseFilterId = this.filterId.toLowerCase();
+      filtered = filtered.filter(group => group.split('\n').some(line => line.toLowerCase().includes(lowerCaseFilterId)));
     }
+
+    if (this.filterSignalR || this.highlightSignalR || this.highlightHub) {
+      filtered = filtered.filter(group =>
+        group.split('\n').some(line => {
+          const includesSignalR = line.includes('[SignalR]');
+          const includesHub = line.includes('WebScapeHub');
   
-    // Filter by SignalR
-    if (this.filterSignalR) {
-      filtered = filtered.filter(group => group.split('\n').some(line => line.includes('[SignalR]') || line.includes('WebScapeHub')));
+          return (
+            (this.filterSignalR && (includesSignalR || includesHub)) || // [SignalR]
+            (this.highlightSignalR && includesSignalR) || // Client-[SignalR]
+            (this.highlightHub && includesHub) // Hub-[SignalR]
+          );
+        })
+      );
     }
-  
-    // Filter by selected error codes (Apache HTTP status codes)
+
     if (this.selectedErrorCodes.length > 0) {
       filtered = filtered.filter(group =>
         group.split('\n').some(line => this.selectedErrorCodes.some(code => this.isApacheHttpStatusInRange(line, code)))
       );
     }
   
-    // Apply other filters if needed
     if (this.filterRequestResponse) {
       filtered = this.filterRequestResponseLogs(filtered);
     }
   
-    // Update filtered logs
     this.filteredLogs = filtered;
-    this.currentPage = 0;
-    this.updateVisibleLogs();
     this.isLoading = false;
   }
 
   isApacheHttpStatusInRange(line: string, baseCode: number): boolean {
-    // Match Apache HTTP status codes in the log line
     const apacheStatusMatch = line.match(/HTTP\/\d\.\d" (\d{3})/);
     if (apacheStatusMatch) {
       const status = parseInt(apacheStatusMatch[1], 10);
       const rangeStart = baseCode;
-      const rangeEnd = baseCode + 99; // Define the range (e.g., 200-299 for 200)
+      const rangeEnd = baseCode + 99;
       return status >= rangeStart && status <= rangeEnd;
     }
     return false;
@@ -295,14 +288,12 @@ export class LogViewerComponent {
   highlightFilter(log: string): SafeHtml {
     let highlightedLog = log;
   
-    // Highlight filterId if provided
     if (this.filterId) {
       const escapedFilterId = this.filterId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(`(${escapedFilterId})`, 'gi');
       highlightedLog = highlightedLog.replace(regex, '<span class="highlight">$1</span>');
     }
   
-    // Highlight selected HTTP status codes
     if (this.selectedErrorCodes.length > 0) {
       this.selectedErrorCodes.forEach(baseCode => {
         const rangeStart = baseCode;
@@ -313,6 +304,11 @@ export class LogViewerComponent {
     }
   
     return this.sanitizer.bypassSecurityTrustHtml(highlightedLog);
+  }
+
+  toggleLogState(index: number, event: Event): void {
+    const isOpen = (event.target as HTMLDetailsElement).open;
+    this.expandedLogs.set(index, isOpen);
   }
 
   @HostListener('document:click', ['$event'])

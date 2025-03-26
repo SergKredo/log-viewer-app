@@ -7,6 +7,7 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { ScrollingModule } from '@angular/cdk/scrolling';
 
 @NgModule({
   declarations: [
@@ -19,7 +20,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
     FormsModule,
     MatSelectModule,
     MatCheckboxModule,
-    MatFormFieldModule
+    MatFormFieldModule,
+    ScrollingModule
   ],
   providers: [],
   bootstrap: [AppComponent]
