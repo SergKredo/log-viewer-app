@@ -12,7 +12,10 @@ import { ScrollingModule } from '@angular/cdk/scrolling';
     <div class="container">
       <h2>Log Upload and Filtering</h2>
       <div class="controls">
-        <input type="file" (change)="loadFile($event)" accept=".log,.txt" />
+        <div class="file-controls">
+          <input type="file" (change)="loadFile($event)" accept=".log,.txt" class="styled-button" />
+          <button (click)="saveFilteredLogs()" class="styled-button">Save data</button>
+        </div>
         <input type="text" [(ngModel)]="filterId" placeholder="Enter identifier" class="filter-input" (keyup.enter)="filterLogs()" />
         <button (click)="filterLogs()">Filter</button>
         <label class="signalr-label">
@@ -102,7 +105,24 @@ import { ScrollingModule } from '@angular/cdk/scrolling';
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); 
     }`,
     `::ng-deep .dropdown-item { display: flex; align-items: center; padding: 2px 0; }`,
-    `::ng-deep .dropdown-item input { margin-right: 5px; }`
+    `::ng-deep .dropdown-item input { margin-right: 5px; }`,
+    `.file-controls { 
+        display: flex; 
+        flex-direction: column; 
+        align-items: stretch; 
+        gap: 5px; 
+    }`,
+    `.styled-button { 
+        padding: 5px 10px; 
+        font-size: 14px; 
+        background-color: #f4f4f4; 
+        border: 1px solid #ccc; 
+        border-radius: 4px; 
+        cursor: pointer; 
+    }`,
+    `.styled-button:hover { 
+        background-color: #e0e0e0; 
+    }`
   ],
   imports: [CommonModule, FormsModule, MatSelectModule, MatFormFieldModule, ScrollingModule]
 })
@@ -133,13 +153,22 @@ export class LogViewerComponent {
       this.zone.run(() => {
         this.logs = e.target.result.split('\n');
         this.filteredLogs = this.groupLogs(this.logs);
-        console.log('Filtered Logs:', this.filteredLogs); // Debugging output
         this.totalLogs = this.filteredLogs.length;
         this.isLoading = false; // End loading
         this.cdr.detectChanges(); // Notify Angular about changes
       });
     };
     reader.readAsText(file);
+  }
+
+  saveFilteredLogs(): void {
+    const blob = new Blob([this.filteredLogs.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'filtered-logs.txt';
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   filterLogs(): void {
