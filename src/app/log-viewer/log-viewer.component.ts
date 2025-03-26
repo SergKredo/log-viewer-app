@@ -8,125 +8,12 @@ import { ScrollingModule } from '@angular/cdk/scrolling';
 
 @Component({
   selector: 'app-log-viewer',
-  template: `
-    <div class="container">
-      <h2>Log Upload and Filtering</h2>
-      <div class="controls">
-        <div class="file-controls">
-          <input type="file" (change)="loadFile($event)" accept=".log,.txt" class="styled-button" />
-          <button (click)="saveFilteredLogs()" class="styled-button">Save data</button>
-        </div>
-        <input type="text" [(ngModel)]="filterId" placeholder="Enter identifier" class="filter-input" (keyup.enter)="filterLogs()" />
-        <button (click)="filterLogs()">Filter</button>
-        <label class="signalr-label">
-          <input type="checkbox" [(ngModel)]="highlightSignalR" /> Client-[SignalR]
-        </label>
-        <label class="hub-label">
-          <input type="checkbox" [(ngModel)]="highlightHub" /> Hub-[SignalR]
-        </label>
-        <label class="filter-signalr-label">
-          <input type="checkbox" [(ngModel)]="filterSignalR" (change)="filterLogs()" /> [SignalR]
-        </label>
-        <label class="request-response-label">
-          <input type="checkbox" [(ngModel)]="filterRequestResponse" (change)="filterLogs()" /> Request-Response
-        </label>
-        <div class="error-code-control">
-          <label class="error-code-label">[HTTP code Apache]</label>
-          <div class="dropdown">
-            <button (click)="toggleDropdown()" class="dropdown-trigger fixed-width">{{ renderSelectedErrors() }}</button>
-            <div *ngIf="dropdownOpen" class="dropdown-content">
-              <label *ngFor="let error of errorCodes" class="dropdown-item">
-                <input 
-                  type="checkbox" 
-                  [value]="error" 
-                  (change)="toggleError(error)" 
-                  [checked]="selectedErrorCodes.includes(error)"
-                /> {{ error }}
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="log-info">
-        <label>Total logs in file: {{ totalLogs }}</label>
-        <label>Filtered logs: {{ filteredLogs.length }}</label>
-      </div>
-      <div class="log-container">
-        <cdk-virtual-scroll-viewport itemSize="10" class="virtual-scroll-viewport">
-          <div *cdkVirtualFor="let log of filteredLogs; let i = index" [ngClass]="{'highlight-signalr': highlightSignalR && log.includes('[SignalR]'), 'highlight-hub': highlightHub && log.includes('WebScapeHub')}">
-            <details [open]="expandedLogs.get(i) || false" (toggle)="toggleLogState(i, $event)">
-              <summary>{{ log.split('\n')[0] }}</summary>
-              <pre [innerHTML]="highlightFilter(log)"></pre>
-            </details>
-          </div>
-        </cdk-virtual-scroll-viewport>
-      </div>
-    </div>
-  `,
-  styles: [
-    `.container { width: 100%; height: 100vh; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding: 0px; box-sizing: border-box; overflow: hidden; }`,
-    `.controls { display: flex; gap: 10px; margin-bottom: 5px; flex-wrap: wrap; max-width: 1800px; width: calc(100% - 20px); justify-content: center; align-items: center; }`,
-    `h2 { margin: 0 0 5px 0; font-size: 1.5rem; }`,
-    `input, button { padding: 5px; }`,
-    `.filter-input { width: 400px; }`,
-    `.log-info { display: flex; gap: 20px; max-width: 1800px; width: calc(100% - 20px); margin-bottom: 10px; justify-content: center; }`,
-    `.log-container { height: calc(100vh - 150px); width: calc(100% - 20px); max-width: 1800px; flex-grow: 1; text-align: left; background: #f4f4f4; padding: 10px; margin: 0 auto; overflow-y: auto; border: 1px solid #ccc;}`,
-    `.label { margin-right: 10px; }`,
-    `.signalr-label { display: flex; align-items: center; background-color: red; padding: 5px; border-radius: 5px; }`,
-    `.hub-label { display: flex; align-items: center; background-color: yellow; padding: 5px; border-radius: 5px; }`,
-    `.filter-signalr-label { display: flex; align-items: center; }`,
-    `.request-response-label { display: flex; align-items: center; }`,
-    `.highlight-signalr { background-color: #ffcccc; }`,
-    `.highlight-hub { background-color: #ffffcc; }`,
-    `.loader { text-align: center; font-size: 20px; padding: 20px; }`,
-    `.virtual-scroll-viewport {
-        height: calc(100vh - 196px); /* Adjust height as needed */
-        width: 100%;
-        overflow: auto;
-        border: 1px solid #ccc;
-        box-sizing: border-box;
-      }`,
-    `.highlight { background-color: #28a745; color: white; font-weight: bold; padding: 2px 4px; border-radius: 3px; }`,
-    `.highlight-http { background-color: orange; color: black; font-weight: bold; padding: 2px 4px; border-radius: 3px; }`,
-    `::ng-deep .error-code-control { position: relative; display: inline-flex; align-items: center; gap: 10px; }`,
-    `::ng-deep .error-code-label { font-weight: bold; }`,
-    `::ng-deep .dropdown-trigger.fixed-width { width: 200px; padding: 5px 10px; background-color: white; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }`,
-    `::ng-deep .dropdown { position: relative;}`,
-    `::ng-deep .dropdown-content { 
-      position: absolute; 
-      top: 100%; 
-      left: 0;
-      background: white; 
-      border: 1px solid #ccc; 
-      border-radius: 4px; 
-      padding: 5px; 
-      z-index: 1000; 
-      min-width: 94%;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); 
-    }`,
-    `::ng-deep .dropdown-item { display: flex; align-items: center; padding: 2px 0; }`,
-    `::ng-deep .dropdown-item input { margin-right: 5px; }`,
-    `.file-controls { 
-        display: flex; 
-        flex-direction: column; 
-        align-items: stretch; 
-        gap: 5px; 
-    }`,
-    `.styled-button { 
-        padding: 5px 10px; 
-        font-size: 14px; 
-        background-color: #f4f4f4; 
-        border: 1px solid #ccc; 
-        border-radius: 4px; 
-        cursor: pointer; 
-    }`,
-    `.styled-button:hover { 
-        background-color: #e0e0e0; 
-    }`
-  ],
+  templateUrl: './log-viewer.component.html',
+  styleUrls: ['./log-viewer.component.css'],
   imports: [CommonModule, FormsModule, MatSelectModule, MatFormFieldModule, ScrollingModule]
 })
 export class LogViewerComponent {
+  fileName: string = '';
   logs: string[] = [];
   filteredLogs: string[] = [];
   expandedLogs: Map<number, boolean> = new Map(); // Stores expanded/collapsed state of logs
@@ -147,6 +34,8 @@ export class LogViewerComponent {
   loadFile(event: any): void {
     const file = event.target.files[0];
     if (!file) return;
+
+    this.fileName = file.name;
     this.isLoading = true; // Start loading
     const reader = new FileReader();
     reader.onload = (e: any) => {

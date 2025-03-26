@@ -1,1 +1,57 @@
-<p>log-viewer works!</p>
+<div class="container">
+    <h2>Log Upload and Filtering</h2>
+    <div class="controls">
+      <div class="file-controls">
+        <button (click)="saveFilteredLogs()" class="styled-button">Save data</button>
+        <label class="custom-file-button">
+          Choose File
+          <input type="file" (change)="loadFile($event)" accept=".log,.txt" />
+        </label>
+        <label class="file-name-label">{{ fileName ? fileName : 'No file chosen' }}</label>
+      </div>
+      <input type="text" [(ngModel)]="filterId" placeholder="Enter identifier" class="filter-input" (keyup.enter)="filterLogs()" />
+      <button (click)="filterLogs()">Filter</button>
+      <label class="signalr-label">
+        <input type="checkbox" [(ngModel)]="highlightSignalR" /> Client-[SignalR]
+      </label>
+      <label class="hub-label">
+        <input type="checkbox" [(ngModel)]="highlightHub" /> Hub-[SignalR]
+      </label>
+      <label class="filter-signalr-label">
+        <input type="checkbox" [(ngModel)]="filterSignalR" (change)="filterLogs()" /> [SignalR]
+      </label>
+      <label class="request-response-label">
+        <input type="checkbox" [(ngModel)]="filterRequestResponse" (change)="filterLogs()" /> Request-Response
+      </label>
+      <div class="error-code-control">
+        <label class="error-code-label">[HTTP code Apache]</label>
+        <div class="dropdown">
+          <button (click)="toggleDropdown()" class="dropdown-trigger fixed-width">{{ renderSelectedErrors() }}</button>
+          <div *ngIf="dropdownOpen" class="dropdown-content">
+            <label *ngFor="let error of errorCodes" class="dropdown-item">
+              <input 
+                type="checkbox" 
+                [value]="error" 
+                (change)="toggleError(error)" 
+                [checked]="selectedErrorCodes.includes(error)"
+              /> {{ error }}
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="log-info">
+      <label>Total logs in file: {{ totalLogs }}</label>
+      <label>Filtered logs: {{ filteredLogs.length }}</label>
+    </div>
+    <div class="log-container">
+      <cdk-virtual-scroll-viewport itemSize="10" class="virtual-scroll-viewport">
+        <div *cdkVirtualFor="let log of filteredLogs; let i = index" [ngClass]="{'highlight-signalr': highlightSignalR && log.includes('[SignalR]'), 'highlight-hub': highlightHub && log.includes('WebScapeHub')}">
+          <details [open]="expandedLogs.get(i) || false" (toggle)="toggleLogState(i, $event)">
+            <summary>{{ log.split('\n')[0] }}</summary>
+            <pre [innerHTML]="highlightFilter(log)"></pre>
+          </details>
+        </div>
+      </cdk-virtual-scroll-viewport>
+    </div>
+  </div>
