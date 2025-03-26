@@ -47,7 +47,7 @@
     <div class="log-container">
       <cdk-virtual-scroll-viewport itemSize="10" class="virtual-scroll-viewport">
         <div *cdkVirtualFor="let log of filteredLogs; let i = index" [ngClass]="{'highlight-signalr': highlightSignalR && log.includes('[SignalR]'), 'highlight-hub': highlightHub && log.includes('WebScapeHub')}">
-          <details [open]="expandedLogs.get(i) || false" (toggle)="toggleLogState(i, $event)">
+          <details [open]="expandedLogs.get(i) || false" (toggle)="toggleLogState(i, $event)" tabindex="0">
             <summary>{{ log.split('\n')[0] }}</summary>
             <pre [innerHTML]="highlightFilter(log)"></pre>
           </details>

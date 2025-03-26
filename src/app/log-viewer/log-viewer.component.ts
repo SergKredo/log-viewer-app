@@ -229,7 +229,7 @@ export class LogViewerComponent {
     this.expandedLogs.set(index, isOpen);
   }
 
-  @HostListener('document:click', ['$event'])
+  @HostListener('document:mousedown', ['$event'])
   onDocumentClick(event: MouseEvent): void {
     const target = event.target as HTMLElement;
     const dropdown = document.querySelector('.dropdown-content');

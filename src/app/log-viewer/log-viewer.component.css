@@ -52,7 +52,7 @@
     background: #f4f4f4;
     padding: 10px;
     margin: 0 auto;
-    overflow-y: hidden;
+    overflow-y: auto;
     border: 1px solid #ccc;
   }
   
@@ -101,7 +101,7 @@
   }
   
   .virtual-scroll-viewport {
-    height: calc(100vh - 118px); /* Adjust height as needed */
+    height: calc(100vh - 120px); /* Adjust height as needed */
     width: 100%;
     overflow: auto;
     border: 1px solid #ccc;
@@ -227,4 +227,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 200px;
+  }
+
+  details[open] {
+    user-select: text;
+  }
+
+  pre {
+    user-select: text;
   }
