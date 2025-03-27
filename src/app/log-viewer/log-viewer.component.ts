@@ -140,7 +140,7 @@ export class LogViewerComponent {
       return isoMatch[0];
     }
 
-    const apacheMatch = line.match(/\[\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}\]/);
+    const apacheMatch = line.match(/\[(\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}|[A-Za-z]{3} [A-Za-z]{3} \d{2} \d{2}:\d{2}:\d{2}\.\d+ \d{4})\]/);
     if (apacheMatch) {
       return apacheMatch[0];
     }
