@@ -123,6 +123,17 @@
     padding: 2px 4px;
     border-radius: 3px;
   }
+
+  .highlight-profile-root {
+    background-color: #ffe9a8;
+    color: #4d3400;
+    font-weight: 600;
+    padding: 2px 4px;
+    border-radius: 3px;
+    border: 1px solid #ffc84d;
+    display: inline-block;
+    width: 100%;
+  }
   
   ::ng-deep .error-code-control {
     position: relative;
@@ -236,3 +247,38 @@
   pre {
     user-select: text;
   }
+
+  .profile-summary { 
+    max-width: 1800px; 
+    width: calc(100% - 20px); 
+    margin: 5px auto 10px; 
+    background:#fff; 
+    border:1px solid #ccc; 
+    padding:10px; 
+    border-radius:4px;
+  }
+  .profile-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .profile-table th, .profile-table td { border:1px solid #ddd; padding:4px 6px; text-align:center; }
+  .profile-table th { background:#f2f2f2; }
+  .profile-table td { background:#fafafa; }
+  .profile-table tr:hover td { background:#eef; }
+  .no-profiles { font-size:12px; color:#666; }
+  .threshold-control { margin-bottom:6px; }
+
+   .profile-analysis-block {
+     border: 1px solid #ccc;
+     padding: 6px 10px;
+     border-radius: 4px;
+     display: inline-flex;
+     gap: 12px;
+     align-items: center;
+     background: #f8f9fa;
+     margin-left: 8px;
+   }
+
+   .profile-analysis-title {
+     font-weight: 600;
+     margin-right: 4px;
+   }
+
+

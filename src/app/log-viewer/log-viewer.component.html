@@ -23,6 +23,18 @@
       <label class="request-response-label">
         <input type="checkbox" [(ngModel)]="filterRequestResponse" (change)="filterLogs()" /> Request-Response
       </label>
+      <div class="profile-analysis-block">
+        <div class="profile-analysis-title">Profiling</div>
+        <label class="request-response-label">
+          <input type="checkbox" [(ngModel)]="profilerOnly" (change)="filterLogs()" /> Execution profile only
+        </label>
+        <label class="request-response-label" *ngIf="profilerOnly">
+          <input type="checkbox" [(ngModel)]="showAnalysis" (change)="filterLogs()" /> Show analysis
+        </label>
+        <label class="request-response-label" *ngIf="profilerOnly && showAnalysis">
+          <input type="checkbox" [(ngModel)]="slowOnly" (change)="filterLogs()" /> Slow only
+        </label>
+      </div>
       <div class="error-code-control">
         <label class="error-code-label">[HTTP code Apache]</label>
         <div class="dropdown">
@@ -42,11 +54,42 @@
     </div>
     <div class="log-info">
       <label>Total logs in file: {{ totalLogs }}</label>
-      <label>Filtered logs: {{ filteredLogs.length }}</label>
+  <label>Filtered logs: {{ filteredLogs.length }}</label>
+  <label *ngIf="profilerOnly && showAnalysis && slowOnly">Displayed slow: {{ displayedLogs.length }}</label>
+    </div>
+    <div *ngIf="profilerOnly && showAnalysis" class="profile-summary">
+      <div class="threshold-control">
+        <label>Slow threshold (s): <input type="number" step="0.01" [(ngModel)]="slowThreshold" (change)="updateProfileStats()" style="width:80px;" /></label>
+      </div>
+      <table class="profile-table" *ngIf="aggregatedProfiles.count > 0">
+        <thead>
+          <tr>
+            <th>Requests</th>
+            <th>Avg Total (s)</th>
+            <th>Avg Self (s)</th>
+            <th>Max Total (s)</th>
+            <th>Slow (>= {{ slowThreshold }}s)</th>
+            <th>Slow %</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{{ aggregatedProfiles.count }}</td>
+            <td>{{ (aggregatedProfiles.total / aggregatedProfiles.count) | number:'1.3-3' }}</td>
+            <td>{{ (aggregatedProfiles.self / aggregatedProfiles.count) | number:'1.3-3' }}</td>
+            <td>{{ aggregatedProfiles.maxTotal | number:'1.3-3' }}</td>
+            <td>{{ aggregatedProfiles.slowCount }}</td>
+            <td>{{ (aggregatedProfiles.slowCount / aggregatedProfiles.count * 100) | number:'1.0-1' }}%</td>
+          </tr>
+        </tbody>
+      </table>
+  <div *ngIf="aggregatedProfiles.count === 0" class="no-profiles">No profiles found for patterns: /api/data POST, "Too long execution" or "Execution profile"</div>
     </div>
     <div class="log-container">
       <cdk-virtual-scroll-viewport itemSize="10" class="virtual-scroll-viewport">
-        <div *cdkVirtualFor="let log of filteredLogs; let i = index" [ngClass]="{'highlight-signalr': highlightSignalR && log.includes('[SignalR]'), 'highlight-hub': highlightHub && log.includes('WebScapeHub')}">
+  <div *cdkVirtualFor="let log of displayedLogs; let i = index"
+       [class.highlight-signalr]="highlightSignalR && log.includes('[SignalR]')"
+       [class.highlight-hub]="highlightHub && log.includes('WebScapeHub')">
           <details [open]="expandedLogs.get(i) || false" (toggle)="toggleLogState(i, $event)" tabindex="0">
             <summary>{{ log.split('\n')[0] }}</summary>
             <pre [innerHTML]="highlightFilter(log)"></pre>
@@ -54,4 +97,5 @@
         </div>
       </cdk-virtual-scroll-viewport>
     </div>
+
   </div>
