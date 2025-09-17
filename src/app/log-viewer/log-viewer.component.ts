@@ -80,10 +80,42 @@ export class LogViewerComponent {
   }
 
   saveFilteredLogs(): void {
-    const blob = new Blob([this.filteredLogs.join('\n')], { type: 'text/plain' });
+    const analysisActive = this.profilerOnly && this.showAnalysis;
+    const linesToSave = analysisActive ? this.displayedLogs : this.filteredLogs;
+    let header = '';
+    if (analysisActive && this.aggregatedProfiles.count > 0) {
+      const avgTotal = this.aggregatedProfiles.total / this.aggregatedProfiles.count;
+      const avgSelf = this.aggregatedProfiles.self / this.aggregatedProfiles.count;
+      const slowPct = this.aggregatedProfiles.count ? (this.aggregatedProfiles.slowCount / this.aggregatedProfiles.count * 100) : 0;
+      const slowFlag = this.slowOnly ? 'true' : 'false';
+      const separator = '============================================================';
+      header = [
+        separator,
+        'PROFILING SUMMARY',
+        separator,
+        `Source File        : ${this.fileName || 'N/A'}`,
+        `Threshold (s)      : ${this.slowThreshold}`,
+        `Slow Only Mode     : ${slowFlag}`,
+        '',
+        `Requests           : ${this.aggregatedProfiles.count}`,
+        `Avg Total (s)      : ${avgTotal.toFixed(3)}`,
+        `Avg Self (s)       : ${avgSelf.toFixed(3)}`,
+        `Max Total (s)      : ${this.aggregatedProfiles.maxTotal.toFixed(3)}`,
+        `Slow (>=threshold) : ${this.aggregatedProfiles.slowCount}`,
+        `Slow %             : ${slowPct.toFixed(1)}%`,
+        separator,
+        '',
+        'FILTERED PROFILING LOG ENTRIES',''
+      ].join('\n');
+    }
+    const content = header + linesToSave.join('\n');
+    const base = this.fileName ? this.fileName.replace(/\.[^.]+$/, '') : 'logs';
+    const suffix = analysisActive ? 'profiling' : 'filtered';
+    const outName = `${base}-${suffix}.txt`;
+    const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'filtered-logs.txt'; a.click();
+    a.href = url; a.download = outName; a.click();
     URL.revokeObjectURL(url);
   }
 
